@@ -1,0 +1,17 @@
+{
+  "name": "call-calendar-spec",
+  "version": "1.2.0",
+  "private": true,
+  "description": "TypeSpec contract for Call Calendar; compiles to OpenAPI 3 and serves a Prism mock.",
+  "scripts": {
+    "compile": "tsp compile main.tsp",
+    "mock": "prism mock tsp-output/@typespec/openapi3/openapi.yaml --dynamic --port 4010 --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "~0.65.0",
+    "@typespec/http": "~0.65.0",
+    "@typespec/rest": "~0.65.0",
+    "@typespec/openapi3": "~0.65.0",
+    "@stoplight/prism-cli": "^5.15.10"
+  }
+}

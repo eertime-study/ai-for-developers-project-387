@@ -1,0 +1,30 @@
+# Зависимости и артефакты сборки — собираем заново внутри образа
+**/node_modules
+**/dist
+**/tsp-output
+
+# Тестовый мусор
+**/coverage
+**/test-results
+**/playwright-report
+
+# VCS и инструменты CI/IDE
+.git
+.gitignore
+.github
+.claude
+
+# Локальные env — критично: frontend/.env с VITE_API_URL=http://localhost:3000
+# иначе перетрёт VITE_API_URL=/api, который выставлен в Dockerfile.
+**/.env
+**/.env.*
+
+# E2E используется только Playwright'ом, в рантайме не нужен
+e2e
+
+# Системное
+**/.DS_Store
+
+# Сам Dockerfile / dockerignore класть в образ незачем
+Dockerfile
+.dockerignore

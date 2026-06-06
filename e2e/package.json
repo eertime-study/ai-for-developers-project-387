@@ -1,0 +1,17 @@
+{
+  "name": "call-calendar-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright end-to-end tests for the Call Calendar app (booking happy path).",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2"
+  }
+}

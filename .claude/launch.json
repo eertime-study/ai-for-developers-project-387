@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prism-mock",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "--prefix", "spec", "mock"],
+      "port": 4010
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "--prefix", "frontend", "dev"],
+      "port": 5173
+    }
+  ]
+}
