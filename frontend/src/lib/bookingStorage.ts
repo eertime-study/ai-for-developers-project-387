@@ -57,11 +57,7 @@ export function readConfirmation(): GuestBookingConfirmation | null {
     }
 
     // Битые / устаревшие данные иной формы — чистим, чтобы не висел мусор.
-    try {
-      sessionStorage.removeItem(STORAGE_KEY)
-    } catch {
-      // ignore
-    }
+    sessionStorage.removeItem(STORAGE_KEY)
     return null
   } catch {
     return null

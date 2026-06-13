@@ -45,9 +45,6 @@ export default function BookingSuccessPage() {
             <Button asChild className="w-full">
               <Link to="/">К типам встреч</Link>
             </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/admin">Открыть расписание</Link>
-            </Button>
           </div>
         </CardContent>
       </Card>
