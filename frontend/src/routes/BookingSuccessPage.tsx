@@ -1,10 +1,12 @@
-import { Link, Navigate, useLocation } from 'react-router-dom'
-import { Check } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { Check, CalendarX } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useOwner } from '@/api/queries'
 import { formatDate, formatRange } from '@/lib/time'
+import { readConfirmation } from '@/lib/bookingStorage'
 import type { components } from '@/api/schema'
 
 type Confirmation = components['schemas']['GuestBookingConfirmation']
@@ -12,13 +14,45 @@ type Confirmation = components['schemas']['GuestBookingConfirmation']
 export default function BookingSuccessPage() {
   const location = useLocation()
   const ownerQ = useOwner()
-  const data = location.state as Confirmation | null
 
-  if (!data) {
-    return <Navigate to="/" replace />
-  }
+  // Читаем один раз при монтировании: быстрый путь — navigation state, фолбэк после
+  // перезагрузки — sessionStorage (с безопасным разбором и zod-валидацией внутри).
+  const [data] = useState<Confirmation | null>(
+    () => (location.state as Confirmation | null) ?? readConfirmation(),
+  )
 
   const timeZone = ownerQ.data?.timeZone ?? 'UTC'
+
+  if (!data) {
+    return (
+      <Card>
+        <CardContent className="space-y-6 p-6 text-center sm:p-8">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <CalendarX className="h-7 w-7" strokeWidth={2.5} />
+          </div>
+
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Информация о встрече недоступна
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Если вы только что бронировали — встреча сохранена в расписании владельца.
+              Детали этой брони больше не доступны в текущей вкладке.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Button asChild className="w-full">
+              <Link to="/">К типам встреч</Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/admin">Открыть расписание</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>

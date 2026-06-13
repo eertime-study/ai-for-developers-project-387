@@ -37,6 +37,15 @@ test('гость бронирует первый available-слот и слот 
   await expect(page.getByText('Иван Тестов')).toBeVisible()
   await expect(page.getByText('ivan@test.io')).toBeVisible()
 
+  // 5a. Регрессия issue #3: обновление вкладки на экране успеха не теряет детали.
+  // location.state живёт только в памяти; данные восстанавливаются из sessionStorage.
+  await page.reload()
+  await expect(page).toHaveURL(/\/bookings\/success$/)
+  await expect(page.getByRole('heading', { name: 'Встреча забронирована!' })).toBeVisible()
+  await expect(page.getByText('Вводный звонок')).toBeVisible()
+  await expect(page.getByText('Иван Тестов')).toBeVisible()
+  await expect(page.getByText('ivan@test.io')).toBeVisible()
+
   // 6. Возврат к типам и повторный заход в сетку — тот же слот теперь booked.
   await page.getByRole('link', { name: 'Вернуться к типам встреч' }).click()
   await expect(page).toHaveURL(/\/$/)
