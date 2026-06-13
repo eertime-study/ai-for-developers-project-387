@@ -5,6 +5,10 @@ on:
     branches: ['**']
   pull_request:
 
+# Минимально необходимые права: e2e только читает код, гоняет тесты и грузит артефакты.
+permissions:
+  contents: read
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
