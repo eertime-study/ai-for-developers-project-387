@@ -1,0 +1,113 @@
+name: Lighthouse
+
+on:
+  schedule:
+    # ~03:17 UTC каждую ночь. Минуту берём не «в ноль» намеренно: GitHub советует не ставить
+    # запуск на начало часа (пик нагрузки → задержки). Минимальный интервал cron в Actions — 5 мин.
+    # Расписание читается только из дефолтной ветки. Правится под TZ команды (crontab.guru).
+    - cron: "17 3 * * *"
+  # Ручной запуск той же задачи (Actions → Lighthouse → Run workflow / gh workflow run).
+  workflow_dispatch:
+
+# Прав пользователя у cron нет — задаём явно. Агенту нужно: открыть issue (issues) и
+# закоммитить обновлённый базлайн (contents). PR не создаём — правки фиксируем как issue.
+permissions:
+  id-token: write
+  contents: write
+  issues: write
+
+env:
+  BASE_URL: https://ai-for-developers-project-386-isaw.onrender.com
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # OpenCode-агент аутентифицируется сам (id-token), креды checkout ему не нужны.
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Warm up Render (free tier спит — будим до замеров)
+        run: |
+          echo "Пингуем $BASE_URL/api/owner, пока не проснётся (до ~150 c)…"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/owner" || echo "000")
+            echo "  попытка $i: HTTP $code"
+            if [ "$code" = "200" ]; then echo "Render проснулся."; exit 0; fi
+            sleep 5
+          done
+          echo "::warning::Render не ответил 200 за отведённое время — Lighthouse всё равно попробует."
+
+      - name: Run Lighthouse CI
+        # warn-level пороги job не валят; continue-on-error — подстраховка, чтобы артефакт и
+        # отчёт агента отработали при любом исходе замеров.
+        continue-on-error: true
+        run: npx @lhci/cli@0.15.x autorun
+
+      - name: Upload Lighthouse report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/**
+          retention-days: 30
+
+      - name: Morning report via OpenCode agent
+        if: always()
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          # Проверенная рабочая модель из opencode.yml. Для экономии на ночной рутине можно
+          # заменить на более дешёвую (напр. opencode/claude-sonnet-4-6).
+          model: opencode/claude-opus-4-8
+          prompt: |
+            Ты — ночной аудитор производительности этого репозитория. Только что в этом же
+            прогоне отработал Lighthouse CI; его результаты лежат в каталоге `.lighthouseci/`
+            рабочей директории. Аудировались две страницы прод-приложения:
+            - Главная (гость): https://ai-for-developers-project-386-isaw.onrender.com/
+            - Админка владельца: https://ai-for-developers-project-386-isaw.onrender.com/admin/bookings
+
+            Сделай следующее:
+
+            1. Прочитай результаты прогона:
+               - `.lighthouseci/manifest.json` — бери представительный прогон (isRepresentativeRun:true)
+                 для каждой страницы; в `summary` лежат оценки категорий (0..1):
+                 performance, accessibility, best-practices, seo.
+               - `.lighthouseci/links.json` — публичные ссылки на HTML-отчёты (temporary-public-storage).
+               - соответствующий `.lighthouseci/lhr-*.json` (по jsonPath из manifest) — оттуда возьми
+                 lab-метрики из `audits`: largest-contentful-paint, total-blocking-time,
+                 cumulative-layout-shift, first-contentful-paint, speed-index (numericValue).
+               Оценки категорий приводи в шкале 0–100.
+
+            2. Прочитай текущий базлайн `docs/performance-baseline.md` и сравни с ним свежие числа
+               по каждой странице. Если прошлых значений нет (первый прогон) — так и напиши, что
+               фиксируешь стартовый базлайн. Пометь любые метрики/оценки, ухудшившиеся более чем
+               на 10% относительно базлайна.
+
+            3. Открой GitHub issue с заголовком вида `[lighthouse] Ночной отчёт — YYYY-MM-DD`
+               (UTC-дата прогона). В теле:
+               - таблица оценок категорий и lab-метрик по каждой из двух страниц;
+               - публичные ссылки на HTML-отчёты;
+               - блок «Тренд vs базлайн» — что выросло/просело, с явной пометкой регрессий >10%;
+               - «Рекомендуемые правки» — приоритизированный список конкретных действий по итогам
+                 худших аудитов (opportunities/diagnostics), со ссылками на файлы фронтенда
+                 (frontend/src/...), где это уместно.
+               Если уже есть ОТКРЫТЫЙ issue с префиксом `[lighthouse]` — не плоди дубликат:
+               добавь новый комментарий с этим отчётом и сошлись на него. Лейблы не обязательны.
+
+            4. Обнови `docs/performance-baseline.md`: впиши свежие значения по обеим страницам
+               (категории + lab-метрики + UTC-дату прогона) и закоммить изменение в текущую ветку
+               с понятным сообщением (напр. `chore(lighthouse): update performance baseline`).
+               Это базлайн для следующего прогона.
+
+            Контракт (`spec/main.tsp`, `openapi.yaml`) и `.github/workflows/hexlet-check.yml`
+            не трогай.

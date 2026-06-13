@@ -156,6 +156,16 @@ docker run --rm -p 8080:8080 -e PORT=8080 call-calendar
 
 Render-конфигурация: Web Service из Dockerfile (Dockerfile path `./Dockerfile`, root directory пуст), health check path `/api/owner`, free tier. На локальный dev/E2E деплойная упаковка не влияет — backend сохраняет старое поведение (роуты на корне, CORS на localhost-портах), когда `API_PREFIX`/`STATIC_DIR` не заданы.
 
+### Регулярный аудит производительности (Lighthouse)
+
+Ночная проверка производительности задеплоенного приложения через Lighthouse CI —
+[.github/workflows/lighthouse.yml](.github/workflows/lighthouse.yml).
+
+- **Когда:** по расписанию (`cron`, ~03:17 UTC каждую ночь) и **вручную** — `Actions → Lighthouse → Run workflow` (или `gh workflow run lighthouse.yml`).
+- **Что:** `lhci autorun` гоняет Lighthouse (3 прогона, медиана) по двум страницам прода — `/` и `/admin/bookings`. Перед замерами идёт warmup-пинг, чтобы разбудить «спящий» Render free tier.
+- **Где смотреть отчёт:** HTML-отчёт публикуется в `temporary-public-storage` (ссылка в логах прогона и в issue) и сохраняется как артефакт `lighthouse-report` (`.lighthouseci/`, 30 дней).
+- **Утренний результат:** по итогам OpenCode-агент открывает issue `[lighthouse] Ночной отчёт — …` с оценками, трендом против [docs/performance-baseline.md](docs/performance-baseline.md) (регрессии >10% помечаются) и приоритизированным списком правок. Базлайн агент обновляет сам — так отслеживается тренд между прогонами.
+
 ### Полезные скрипты
 
 | Команда | Где | Назначение |
