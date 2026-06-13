@@ -6,3 +6,7 @@
 !.claude/launch.json
 !.claude/skills/
 !.claude/skills/**
+
+# Lighthouse CI: результаты прогона и сгенерированная сводка (артефакты, не исходники)
+.lighthouseci/
+lighthouse-summary.md

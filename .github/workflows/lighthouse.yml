@@ -22,13 +22,13 @@ env:
 jobs:
   lighthouse:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # OpenCode-агент аутентифицируется сам (id-token), креды checkout ему не нужны.
-          persist-credentials: false
+          # persist-credentials: true — чтобы агент мог запушить обновлённый базлайн через токен Actions.
+          persist-credentials: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -52,12 +52,18 @@ jobs:
         continue-on-error: true
         run: npx @lhci/cli@0.15.x autorun
 
+      - name: Build compact summary for the agent
+        if: always()
+        run: node scripts/lh-summary.mjs
+
       - name: Upload Lighthouse report (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report
-          path: .lighthouseci/**
+          path: |
+            .lighthouseci/**
+            lighthouse-summary.md
           retention-days: 30
 
       - name: Morning report via OpenCode agent
@@ -65,48 +71,45 @@ jobs:
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # У scheduled/dispatch-запуска нет comment-контекста, поэтому токен GitHub отдаём явно —
+          # иначе gh не находит токен в env и упирается в интерактивное разрешение на ~/.config/gh.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           # Проверенная рабочая модель из opencode.yml. Для экономии на ночной рутине можно
           # заменить на более дешёвую (напр. opencode/claude-sonnet-4-6).
           model: opencode/claude-opus-4-8
           prompt: |
             Ты — ночной аудитор производительности этого репозитория. Только что в этом же
-            прогоне отработал Lighthouse CI; его результаты лежат в каталоге `.lighthouseci/`
-            рабочей директории. Аудировались две страницы прод-приложения:
+            прогоне отработал Lighthouse CI по двум страницам прод-приложения:
             - Главная (гость): https://ai-for-developers-project-386-isaw.onrender.com/
             - Админка владельца: https://ai-for-developers-project-386-isaw.onrender.com/admin/bookings
 
+            Готовая компактная сводка свежего прогона лежит в файле `lighthouse-summary.md` в корне
+            рабочей директории (оценки категорий 0–100, lab-метрики LCP/TBT/CLS/FCP/Speed Index и
+            публичные ссылки на HTML-отчёты по каждой странице). Используй её как источник чисел —
+            тяжёлые `.lighthouseci/lhr-*.json` читать не нужно.
+
             Сделай следующее:
 
-            1. Прочитай результаты прогона:
-               - `.lighthouseci/manifest.json` — бери представительный прогон (isRepresentativeRun:true)
-                 для каждой страницы; в `summary` лежат оценки категорий (0..1):
-                 performance, accessibility, best-practices, seo.
-               - `.lighthouseci/links.json` — публичные ссылки на HTML-отчёты (temporary-public-storage).
-               - соответствующий `.lighthouseci/lhr-*.json` (по jsonPath из manifest) — оттуда возьми
-                 lab-метрики из `audits`: largest-contentful-paint, total-blocking-time,
-                 cumulative-layout-shift, first-contentful-paint, speed-index (numericValue).
-               Оценки категорий приводи в шкале 0–100.
+            1. Прочитай `lighthouse-summary.md` и текущий базлайн `docs/performance-baseline.md`.
+               Сравни свежие числа с базлайном по каждой странице. Если прошлых значений нет
+               (первый прогон) — так и напиши, что фиксируешь стартовый базлайн. Пометь любые
+               метрики/оценки, ухудшившиеся более чем на 10% относительно базлайна.
 
-            2. Прочитай текущий базлайн `docs/performance-baseline.md` и сравни с ним свежие числа
-               по каждой странице. Если прошлых значений нет (первый прогон) — так и напиши, что
-               фиксируешь стартовый базлайн. Пометь любые метрики/оценки, ухудшившиеся более чем
-               на 10% относительно базлайна.
-
-            3. Открой GitHub issue с заголовком вида `[lighthouse] Ночной отчёт — YYYY-MM-DD`
+            2. Открой GitHub issue (`gh issue create`) с заголовком `[lighthouse] Ночной отчёт — YYYY-MM-DD`
                (UTC-дата прогона). В теле:
                - таблица оценок категорий и lab-метрик по каждой из двух страниц;
                - публичные ссылки на HTML-отчёты;
                - блок «Тренд vs базлайн» — что выросло/просело, с явной пометкой регрессий >10%;
                - «Рекомендуемые правки» — приоритизированный список конкретных действий по итогам
-                 худших аудитов (opportunities/diagnostics), со ссылками на файлы фронтенда
-                 (frontend/src/...), где это уместно.
+                 худших метрик, со ссылками на файлы фронтенда (frontend/src/...), где это уместно.
                Если уже есть ОТКРЫТЫЙ issue с префиксом `[lighthouse]` — не плоди дубликат:
-               добавь новый комментарий с этим отчётом и сошлись на него. Лейблы не обязательны.
+               добавь комментарий с этим отчётом к нему. Лейблы не обязательны.
 
-            4. Обнови `docs/performance-baseline.md`: впиши свежие значения по обеим страницам
-               (категории + lab-метрики + UTC-дату прогона) и закоммить изменение в текущую ветку
-               с понятным сообщением (напр. `chore(lighthouse): update performance baseline`).
+            3. Обнови `docs/performance-baseline.md`: впиши свежие значения по обеим страницам
+               (категории + lab-метрики + UTC-дату прогона) и закоммить изменение в ветку `main`
+               (`git add`, `git commit -m "chore(lighthouse): update performance baseline"`, `git push`).
                Это базлайн для следующего прогона.
 
             Контракт (`spec/main.tsp`, `openapi.yaml`) и `.github/workflows/hexlet-check.yml`
