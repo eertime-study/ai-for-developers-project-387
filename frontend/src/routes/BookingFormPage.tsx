@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useEventType, useCreateBooking, useOwner } from '@/api/queries'
 import { formatDateTime, formatRange, formatDate } from '@/lib/time'
+import { saveConfirmation } from '@/lib/bookingStorage'
 
 const formSchema = z.object({
   guestName: z.string().min(1, 'Укажите имя'),
@@ -32,6 +33,9 @@ export default function BookingFormPage() {
   const eventTypeQ = useEventType(eventTypeId)
   const createBooking = useCreateBooking({
     onSuccess: (data) => {
+      // Единственный writer: дублируем подтверждение в sessionStorage перед навигацией,
+      // чтобы экран успеха пережил перезагрузку вкладки (location.state живёт только в памяти).
+      saveConfirmation(data)
       navigate('/bookings/success', { state: data })
     },
   })
