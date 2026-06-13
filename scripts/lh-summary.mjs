@@ -2,19 +2,60 @@
 // Собирает компактную сводку из результатов Lighthouse CI (.lighthouseci/) в lighthouse-summary.md.
 // Цель — отдать OpenCode-агенту маленький читаемый файл вместо тяжёлых lhr-*.json,
 // чтобы шаг отчёта отрабатывал быстро и дёшево.
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 
 const LHCI_DIR = '.lighthouseci'
 const OUT = 'lighthouse-summary.md'
 
 const read = (p) => JSON.parse(readFileSync(p, 'utf8'))
 
+// LHCI с target=temporary-public-storage пишет lhr-*.json + links.json, но manifest.json
+// появляется не всегда. Поэтому: если манифеста нет — реконструируем его из lhr-*.json,
+// выбирая медианный по performance прогон как представительный (как делает сам LHCI).
+const lhrUrl = (lhr) => lhr.finalUrl || lhr.finalDisplayedUrl || lhr.requestedUrl
+
+const buildManifestFromLhr = () => {
+  const files = readdirSync(LHCI_DIR).filter((f) => f.startsWith('lhr-') && f.endsWith('.json'))
+  if (files.length === 0) return null
+  const byUrl = new Map()
+  for (const f of files) {
+    const jsonPath = `${LHCI_DIR}/${f}`
+    const lhr = read(jsonPath)
+    const url = lhrUrl(lhr)
+    const c = lhr.categories ?? {}
+    const entry = {
+      url,
+      jsonPath,
+      summary: {
+        performance: c.performance?.score,
+        accessibility: c.accessibility?.score,
+        'best-practices': c['best-practices']?.score,
+        seo: c.seo?.score,
+        pwa: c.pwa?.score,
+      },
+    }
+    if (!byUrl.has(url)) byUrl.set(url, [])
+    byUrl.get(url).push(entry)
+  }
+  const manifest = []
+  for (const runs of byUrl.values()) {
+    runs.sort((a, b) => (a.summary.performance ?? 0) - (b.summary.performance ?? 0))
+    const median = runs[Math.floor((runs.length - 1) / 2)]
+    for (const run of runs) manifest.push({ ...run, isRepresentativeRun: run === median })
+  }
+  return manifest
+}
+
 let manifest
 try {
   manifest = read(`${LHCI_DIR}/manifest.json`)
-} catch (e) {
-  console.error(`Не удалось прочитать ${LHCI_DIR}/manifest.json:`, e.message)
-  writeFileSync(OUT, '# Lighthouse summary\n\nРезультаты прогона отсутствуют (manifest.json не найден).\n')
+} catch {
+  manifest = buildManifestFromLhr()
+}
+
+if (!manifest || manifest.length === 0) {
+  console.error('Не удалось собрать сводку: нет ни manifest.json, ни lhr-*.json в .lighthouseci/')
+  writeFileSync(OUT, '# Lighthouse summary\n\nРезультаты прогона отсутствуют (нет данных в .lighthouseci/).\n')
   process.exit(0)
 }
 
