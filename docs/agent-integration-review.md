@@ -52,9 +52,14 @@
   (`/oc explain`, затем итеративная проработка плана фикса).
 - ✅ **Агент создал PR и прошёл ревью** — [#4](https://github.com/eertime-study/ai-for-developers-project-387/pull/4):
   создан по `/oc`, получил общий и inline-комментарии, доработал обе правки в той же ветке, смержен.
-- ✅ **Запуск scheduled workflow** — `lighthouse.yml` отработал через `workflow_dispatch` (агент
-  создал отчёт-issue [#5](https://github.com/eertime-study/ai-for-developers-project-387/issues/5)
-  и обновил базлайн); ночной cron заведётся по расписанию.
+- ✅ **Triage issue** — [#2](https://github.com/eertime-study/ai-for-developers-project-387/issues/2):
+  по `/oc` агент дал краткий разбор BUG-1 (суть, корень в `BookingFormPage.tsx` + `queries.ts`,
+  серьёзность, подход к фиксу, влияние на контракт) — без правок кода.
+- ✅ **Запуск scheduled workflow** — `lighthouse.yml` выполнился по реальному событию `schedule`
+  (cron) — `success` (а также проверялся через `workflow_dispatch`); агент публикует отчёт-issue
+  [#5](https://github.com/eertime-study/ai-for-developers-project-387/issues/5) и обновляет базлайн.
+  Примечание: cron на free-tier GitHub может задерживаться на часы — это нормальное поведение
+  планировщика, не ошибка конфигурации.
 
 ## 5. Самооценка эффективности
 
